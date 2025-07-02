@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Latihan Tracker</title>
+  <script src="https://cdn.tailwindcss.com "></script>
+</head>
+<body class="p-4 md:p-8">
+
+  <div class="max-w-4xl mx-auto bg-white shadow rounded-lg p-6">
+    <h1 class="text-2xl font-bold mb-4">Tracker Latihan Harian</h1>
+
+    <!-- Stats Weekly -->
+    <div id="weeklyStats" class="grid grid-cols-4 gap-2 text-sm mb-4"></div>
+
+    <!-- Calendar -->
+    <div id="calendarHeader" class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-700 mb-2">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+
+    <div id="days" class="grid grid-cols-7 gap-2 text-sm"></div>
+
+    <!-- Buttons -->
+    <div class="mt-6 flex space-x-4">
+      <button onclick="exportToCSV()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Eksport CSV</button>
+      <button onclick="resetData()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Reset Data</button>
+    </div>
+  </div>
+
+  <!-- Modal Dialog -->
+  <div id="modal" class="fixed inset-0 flex items-center justify-center hidden bg-black bg-opacity-50 z-50">
+    <div class="bg-white rounded shadow-lg w-96 p-4">
+      <h2 class="font-bold mb-2">Pilih Latihan Hari Ini</h2>
+
+      <select id="exerciseSelect" class="w-full border rounded p-2 mb-4">
+        <option value="">-- Pilih --</option>
+        <option value="Full Body (Minggu 1-2)">Full Body (Minggu 1-2)</option>
+        <option value="Core + Regangan">Core + Regangan</option>
+        <option value="Full Body (Minggu 3-4)">Full Body (Minggu 3-4)</option>
+        <option value="Full Body (Minggu 5-8)">Full Body (Minggu 5-8)</option>
+        <option value="Rehat / Jalan Ringan">Rehat / Jalan Ringan</option>
+      </select>
+
+      <!-- Info Panduan Latihan -->
+      <div id="exerciseInfo" class="text-xs text-gray-600 mt-2 p-2 bg-gray-100 rounded hidden">
+        Sila pilih latihan untuk melihat panduan harian.
+      </div>
+
+      <div class="flex justify-end space-x-2 mt-4">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded">Batal</button>
+        <button onclick="saveExercise()" class="px-4 py-2 bg-green-500 text-white rounded">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const daysContainer = document.getElementById("days");
+    const weeklyStats = document.getElementById("weeklyStats");
+    const modal = document.getElementById("modal");
+    const exerciseSelect = document.getElementById("exerciseSelect");
+
+    let selectedDateElement = null;
+
+    // Muat logData dari localStorage jika ada
+    let logData = JSON.parse(localStorage.getItem("logData")) || {};
+
+    // Panduan latihan harian
+    const exerciseGuides = {
+      "Full Body (Minggu 1-2)": "Push-up x10 | Plank 20s | Squat x15 | Step-up x8/side | Triceps dip x10",
+      "Core + Regangan": "Leg raises x10 | Russian twist x15 | Dead bug x10 | Side plank x15s/side",
+      "Full Body (Minggu 3-4)": "Push-up x12 | Plank to push-up x8 | Squat x15 | Step-up x10/side | Superman hold 30s",
+      "Full Body (Minggu 5-8)": "Push-up x15 | Plank to push-up x10 | Squat x20 | Step-up x12/side | Superman hold 40s",
+      "Rehat / Jalan Ringan": "Jalan kaki selama 30-60 minit atau regangan otot ringan."
+    };
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth(); // current month
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    // Generate calendar
+    for (let i = 0; i < firstDay; i++) {
+      const emptyDiv = document.createElement("div");
+      daysContainer.appendChild(emptyDiv);
+    }
+
+    for (let date = 1; date <= lastDate; date++) {
+      const dayBox = document.createElement("div");
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+      dayBox.className = "border rounded p-2 cursor-pointer hover:bg-gray-200 text-center";
+      dayBox.innerText = date;
+      dayBox.setAttribute("data-date", key);
+
+      if (logData[key]) {
+        dayBox.classList.add(getBgColor(logData[key]));
+        dayBox.title = logData[key];
+      }
+
+      dayBox.onclick = () => {
+        selectedDateElement = dayBox;
+        modal.classList.remove("hidden");
+      };
+
+      daysContainer.appendChild(dayBox);
+    }
+
+    function getBgColor(exercise) {
+      if (exercise.includes("Minggu 1") || exercise.includes("Minggu 2")) return "bg-yellow-100";
+      if (exercise.includes("Minggu 3") || exercise.includes("Minggu 4")) return "bg-purple-100";
+      if (exercise.includes("Minggu 5") || exercise.includes("Minggu 6")) return "bg-pink-100";
+      if (exercise.includes("Minggu 7") || exercise.includes("Minggu 8")) return "bg-blue-100";
+      if (exercise.includes("Rehat")) return "bg-red-100";
+      return "";
+    }
+
+    function closeModal() {
+      modal.classList.add("hidden");
+      exerciseSelect.value = "";
+      document.getElementById("exerciseInfo").classList.add("hidden");
+    }
+
+    // Papar info berdasarkan pilihan
+    exerciseSelect.addEventListener("change", () => {
+      const selected = exerciseSelect.value;
+      const infoBox = document.getElementById("exerciseInfo");
+
+      if (selected && exerciseGuides[selected]) {
+        infoBox.textContent = exerciseGuides[selected];
+        infoBox.classList.remove("hidden");
+      } else {
+        infoBox.classList.add("hidden");
+      }
+    });
+
+    function saveExercise() {
+      const status = exerciseSelect.value;
+      if (!selectedDateElement || !status) return;
+
+      const key = selectedDateElement.getAttribute("data-date");
+      logData[key] = status;
+
+      // Simpan ke localStorage
+      localStorage.setItem("logData", JSON.stringify(logData));
+
+      selectedDateElement.classList.remove("bg-yellow-100", "bg-purple-100", "bg-pink-100", "bg-blue-100", "bg-red-100");
+
+      selectedDateElement.classList.add(getBgColor(status));
+      selectedDateElement.title = status;
+
+      updateWeeklyStats();
+      closeModal();
+    }
+
+    function exportToCSV() {
+      let csv = "Tarikh,Latihan\n";
+      Object.entries(logData).forEach(([date, exercise]) => {
+        csv += `"${date}","${exercise}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "latihan_tracker.csv";
+      link.click();
+    }
+
+    function resetData() {
+      if (confirm("Anda pasti ingin memadam semua data?")) {
+        localStorage.removeItem("logData");
+        location.reload();
+      }
+    }
+
+    function updateWeeklyStats() {
+      const stats = {};
+      const weeks = [0, 0, 0, 0];
+
+      Object.keys(logData).forEach(dateStr => {
+        const date = new Date(dateStr);
+        if (date.getMonth() !== month) return;
+
+        const weekNum = Math.ceil((date.getDate() + firstDay - 1) / 7);
+        stats[weekNum] = (stats[weekNum] || 0) + 1;
+
+        if (weekNum >= 1 && weekNum <= 2) weeks[0]++;
+        else if (weekNum >= 3 && weekNum <= 4) weeks[1]++;
+        else if (weekNum >= 5 && weekNum <= 6) weeks[2]++;
+        else if (weekNum >= 7 && weekNum <= 8) weeks[3]++;
+      });
+
+      weeklyStats.innerHTML = "";
+
+      for (let i = 0; i < 4; i++) {
+        const div = document.createElement("div");
+        div.className = "bg-gray-200 p-2 rounded text-center";
+        div.innerText = `Minggu ${i * 2 + 1}-${i * 2 + 2}: ${weeks[i] || 0} hari`;
+        weeklyStats.appendChild(div);
+      }
+    }
+
+    updateWeeklyStats();
+  </script>
+
+</body>
+</html>
